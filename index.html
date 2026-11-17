@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portal Data Kependudukan</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="style.css" />
+  <!-- Library SheetJS (Baca & Export Excel) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Library Chart.js (Grafik) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Library jsPDF & AutoTable (Export PDF) -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased">
+
+  <!-- Header -->
+  <header class="bg-gradient-to-r from-blue-900 via-blue-800 to-sky-700 text-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <span class="inline-block px-3 py-1 text-xs font-semibold tracking-wider uppercase bg-white/15 rounded-full mb-2">
+          Dashboard Analisis Demografi
+        </span>
+        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight">Portal Data Kependudukan</h1>
+        <p class="text-blue-100 text-sm mt-1">Unggah file Excel format apa pun—sistem otomatis mengenali data penduduk &amp; menyusun grafiknya</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button id="btnReset" type="button" class="hidden inline-flex items-center gap-2 bg-rose-500 hover:bg-rose-600 text-white text-sm font-semibold px-4 py-2.5 rounded-xl shadow transition cursor-pointer">
+          Reset Data
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+    <!-- Area Upload Excel -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+      <div id="dropZone" class="upload-zone rounded-xl p-8 text-center cursor-pointer transition">
+        <input type="file" id="excelInput" accept=".xlsx, .xls, .csv" class="hidden" />
+        <div class="mx-auto w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+        </div>
+        <h2 class="text-lg font-bold text-slate-800">Pilih atau Tarik File Excel ke Sini</h2>
+        <p class="text-sm text-slate-500 mt-1">Mendukung format <span class="font-semibold text-slate-700">.xlsx</span>, <span class="font-semibold text-slate-700">.xls</span>, atau <span class="font-semibold text-slate-700">.csv</span></p>
+        <p class="text-xs text-slate-400 mt-2">Bebas susunan tabel &amp; urutan kolom — otomatis mengenali Nama, NIK, No. KK, Tanggal Lahir/Umur, dan Alamat</p>
+        <button type="button" id="btnPilihFile" class="mt-4 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-xl shadow-sm transition">
+          Pilih File Excel
+        </button>
+        <p id="fileStatus" class="text-sm font-medium text-emerald-600 mt-3 hidden"></p>
+      </div>
+    </section>
+
+    <!-- Konten Dashboard -->
+    <div id="dashboardContent" class="hidden space-y-8">
+
+      <!-- Kartu Ringkasan Utama (2 Baris × 3 Kolom) -->
+      <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <!-- Baris 1 -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total Penduduk</p>
+          <div class="flex items-baseline justify-between mt-2">
+            <h3 id="statTotal" class="text-3xl font-extrabold text-slate-800">0</h3>
+            <span class="text-xs font-medium text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full">Jiwa</span>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total KK</p>
+          <div class="flex items-baseline justify-between mt-2">
+            <h3 id="statTotalKK" class="text-3xl font-extrabold text-indigo-600">0</h3>
+            <span class="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full">Keluarga</span>
+          </div>
+        </div>
+        <div onclick="filterPUS()" title="Klik untuk menampilkan daftar Pasangan Usia Subur (PUS)" class="bg-white rounded-2xl p-5 border border-emerald-200/90 hover:border-emerald-400 hover:shadow-md shadow-sm cursor-pointer transition">
+          <p class="text-xs font-semibold uppercase tracking-wider text-emerald-700">Jumlah PUS</p>
+          <div class="flex items-baseline justify-between mt-2">
+            <h3 id="statPUS" class="text-3xl font-extrabold text-emerald-600">0</h3>
+            <span class="text-xs font-semibold text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-full">Pasangan</span>
+          </div>
+        </div>
+
+        <!-- Baris 2 -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Laki-Laki</p>
+          <div class="flex items-baseline justify-between mt-2">
+            <h3 id="statLaki" class="text-3xl font-extrabold text-sky-600">0</h3>
+            <span id="persenLaki" class="text-xs font-semibold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-full">0%</span>
+          </div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Perempuan</p>
+          <div class="flex items-baseline justify-between mt-2">
+            <h3 id="statPerempuan" class="text-3xl font-extrabold text-pink-600">0</h3>
+            <span id="persenPerempuan" class="text-xs font-semibold text-pink-700 bg-pink-50 px-2.5 py-1 rounded-full">0%</span>
+          </div>
+        </div>
+        <div onclick="filterNikBermasalah()" title="Klik untuk menampilkan daftar penduduk dengan NIK bermasalah" class="bg-white rounded-2xl p-5 border border-amber-200/90 hover:border-amber-400 hover:shadow-md shadow-sm cursor-pointer transition">
+          <p class="text-xs font-semibold uppercase tracking-wider text-amber-700">NIK Bermasalah</p>
+          <div class="flex items-baseline justify-between mt-2">
+            <h3 id="statNikBermasalah" class="text-3xl font-extrabold text-amber-600">0</h3>
+            <span id="persenNikBermasalah" class="text-xs font-semibold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-full">0%</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bagian Grafik -->
+      <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Grafik 1: Jenis Kelamin -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col">
+          <div class="mb-4">
+            <h3 class="text-base font-bold text-slate-800">Rekapitulasi per Jenis Kelamin</h3>
+            <p class="text-xs text-slate-500">Perbandingan jumlah penduduk Laki-laki dan Perempuan</p>
+          </div>
+          <div class="relative h-64 w-full flex items-center justify-center">
+            <canvas id="chartGender"></canvas>
+          </div>
+          <div id="genderSummaryTable" class="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-3 text-sm"></div>
+        </div>
+
+        <!-- Grafik 2: Kelompok Umur -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col">
+          <div class="mb-4">
+            <h3 class="text-base font-bold text-slate-800">Rekapitulasi per Kelompok Umur</h3>
+            <p class="text-xs text-slate-500">Distribusi berdasarkan 5 kategori rentang usia</p>
+          </div>
+          <div class="relative h-64 w-full">
+            <canvas id="chartAge"></canvas>
+          </div>
+          <div id="ageSummaryGrid" class="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-xs"></div>
+        </div>
+      </section>
+
+      <!-- Tabel Detail Penduduk -->
+      <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-6 border-b border-slate-200 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+          <div>
+            <h3 class="text-base font-bold text-slate-800">Rincian Data Penduduk</h3>
+            <p class="text-xs text-slate-500">Urutan sesuai data asli Excel • Klik nama untuk melihat satu keluarga</p>
+          </div>
+          <div class="flex flex-col sm:flex-row flex-wrap gap-2">
+            <select id="filterGender" aria-label="Filter Jenis Kelamin" class="text-sm border border-slate-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="ALL">Semua Jenis Kelamin</option>
+              <option value="Laki-laki">Laki-laki</option>
+              <option value="Perempuan">Perempuan</option>
+              <option value="Tidak Diketahui">Tidak Diketahui (NIK Bermasalah)</option>
+            </select>
+            <select id="filterAgeGroup" aria-label="Filter Kelompok Umur" class="text-sm border border-slate-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="ALL">Semua Kelompok Umur</option>
+              <option value="PUS">Sasaran PUS (Istri 15–49 Thn)</option>
+              <option value="0-5">0–5 Tahun</option>
+              <option value="6-15">6–15 Tahun</option>
+              <option value="16-49">16–49 Tahun</option>
+              <option value="50-59">50–59 Tahun</option>
+              <option value="60+">60+ Tahun</option>
+            </select>
+            <input type="text" id="searchInput" placeholder="Cari nama / NIK / desa / RT..." class="text-sm border border-slate-300 rounded-xl px-3.5 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <button type="button" id="btnExportExcel" class="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2 rounded-xl shadow-sm transition cursor-pointer">
+              Download Excel
+            </button>
+            <button type="button" id="btnExportPDF" class="inline-flex items-center justify-center gap-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold px-4 py-2 rounded-xl shadow-sm transition cursor-pointer">
+              Download PDF
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto max-h-[520px]">
+          <table class="w-full text-left border-collapse">
+            <thead class="bg-slate-100 text-slate-600 text-xs uppercase font-bold sticky top-0 z-10">
+              <tr>
+                <th class="py-3.5 px-4 border-b border-slate-200 w-12">No</th>
+                <th class="py-3.5 px-4 border-b border-slate-200">Nama Lengkap</th>
+                <th class="py-3.5 px-4 border-b border-slate-200">NIK</th>
+                <th class="py-3.5 px-4 border-b border-slate-200">Jenis Kelamin</th>
+                <th class="py-3.5 px-4 border-b border-slate-200">Tanggal Lahir</th>
+                <th class="py-3.5 px-4 border-b border-slate-200">Umur</th>
+                <th class="py-3.5 px-4 border-b border-slate-200">Kategori Umur</th>
+                <th class="py-3.5 px-4 border-b border-slate-200">Alamat (Desa/Dusun/RT)</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+          </table>
+        </div>
+        <div class="px-6 py-3 bg-slate-50 border-t border-slate-200 text-xs text-slate-500 flex justify-between items-center">
+          <span id="tableCountInfo">Menampilkan 0 data</span>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Modal Pop-up Detail Satu Keluarga -->
+  <div id="familyModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-4xl w-full overflow-hidden">
+      <div class="bg-gradient-to-r from-blue-900 to-sky-700 text-white px-6 py-4 flex items-center justify-between">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider bg-white/15 px-2.5 py-0.5 rounded-full">
+            Rincian Satu Kartu Keluarga
+          </span>
+          <h3 id="modalFamilyTitle" class="text-lg font-extrabold mt-1">Keluarga -</h3>
+          <p id="modalNoKK" class="text-xs text-blue-100 font-mono mt-0.5">No. KK: -</p>
+        </div>
+        <button id="btnCloseModal" type="button" class="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-xl p-2 transition cursor-pointer" title="Tutup">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-x-auto max-h-[65vh]">
+        <table class="w-full text-left border-collapse">
+          <thead class="bg-slate-100 text-slate-600 text-xs uppercase font-bold">
+            <tr>
+              <th class="py-3 px-3 border-b border-slate-200 w-10">No</th>
+              <th class="py-3 px-3 border-b border-slate-200">Nama Lengkap</th>
+              <th class="py-3 px-3 border-b border-slate-200">Status</th>
+              <th class="py-3 px-3 border-b border-slate-200">NIK</th>
+              <th class="py-3 px-3 border-b border-slate-200">Jenis Kelamin</th>
+              <th class="py-3 px-3 border-b border-slate-200">Tgl Lahir</th>
+              <th class="py-3 px-3 border-b border-slate-200">Umur</th>
+            </tr>
+          </thead>
+          <tbody id="modalFamilyBody" class="divide-y divide-slate-100 text-sm"></tbody>
+        </table>
+        <div id="modalFamilyAddress" class="mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-xs text-slate-600"></div>
+      </div>
+
+      <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex flex-wrap justify-between items-center gap-2">
+        <span id="modalFamilyCount" class="text-xs font-semibold text-slate-500">Total: 0 Anggota Keluarga</span>
+        <div class="flex gap-2">
+          <button id="btnFilterThisFamily" type="button" class="text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl transition cursor-pointer">
+            Tampilkan Satu Keluarga Ini di Tabel
+          </button>
+          <button id="btnCloseModalFooter" type="button" class="text-xs font-semibold bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-xl transition cursor-pointer">
+            Tutup
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

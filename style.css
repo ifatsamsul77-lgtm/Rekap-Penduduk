@@ -1,0 +1,33 @@
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+.upload-zone {
+  border: 2px dashed #cbd5e1;
+  background-color: #f8fafc;
+}
+
+.upload-zone:hover,
+.upload-zone.dragover {
+  border-color: #2563eb;
+  background-color: #eff6ff;
+}
+
+/* Custom scrollbar rapi untuk tabel */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
