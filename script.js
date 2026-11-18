@@ -6,6 +6,29 @@ let ageChartInstance = null;
 let activeFamilyKeyFilter = null;
 let currentModalFamilyKey = null;
 
+const DEFAULT_AGE_RANGES = [
+  { id: 'cat_1', label: '0–5 Tahun', min: 0, max: 5 },
+  { id: 'cat_2', label: '6–15 Tahun', min: 6, max: 15 },
+  { id: 'cat_3', label: '16–49 Tahun', min: 16, max: 49 },
+  { id: 'cat_4', label: '50–59 Tahun', min: 50, max: 59 },
+  { id: 'cat_5', label: '60+ Tahun', min: 60, max: null }
+];
+
+let customAgeRanges = loadSavedAgeRanges();
+
+function loadSavedAgeRanges() {
+  try {
+    const saved = localStorage.getItem('portal_kependudukan_age_ranges');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.warn('Gagal memuat kategori usia tersimpan:', e);
+  }
+  return JSON.parse(JSON.stringify(DEFAULT_AGE_RANGES));
+}
+
 // Elemen DOM Utama
 const dropZone = document.getElementById('dropZone');
 const excelInput = document.getElementById('excelInput');
@@ -104,6 +127,176 @@ btnFilterThisFamily.addEventListener('click', () => {
 
 function closeFamilyModal() {
   familyModal.classList.add('hidden');
+}
+
+// ============================================================================
+// PENGATURAN KATEGORI USIA KUSTOM (DINAMIS)
+// ============================================================================
+const btnToggleAgeConfig = document.getElementById('btnToggleAgeConfig');
+const ageConfigPanel = document.getElementById('ageConfigPanel');
+const ageRangesContainer = document.getElementById('ageRangesContainer');
+const btnAddAgeRange = document.getElementById('btnAddAgeRange');
+const btnResetAgeRanges = document.getElementById('btnResetAgeRanges');
+const btnApplyAgeRanges = document.getElementById('btnApplyAgeRanges');
+
+if (btnToggleAgeConfig) {
+  btnToggleAgeConfig.addEventListener('click', () => {
+    const isHidden = ageConfigPanel.classList.contains('hidden');
+    if (isHidden) {
+      renderAgeRangeInputs();
+      ageConfigPanel.classList.remove('hidden');
+      btnToggleAgeConfig.textContent = 'Tutup Pengaturan';
+    } else {
+      ageConfigPanel.classList.add('hidden');
+      btnToggleAgeConfig.textContent = 'Atur Rentang Usia';
+    }
+  });
+}
+
+if (btnAddAgeRange) {
+  btnAddAgeRange.addEventListener('click', () => {
+    const rows = getAgeRangesFromInputs();
+    const lastMax = rows.length && rows[rows.length - 1].max !== null ? rows[rows.length - 1].max + 1 : 0;
+    rows.push({
+      id: `cat_${Date.now()}`,
+      label: '',
+      min: lastMax,
+      max: lastMax + 5
+    });
+    renderAgeRangeInputs(rows);
+  });
+}
+
+if (btnResetAgeRanges) {
+  btnResetAgeRanges.addEventListener('click', () => {
+    customAgeRanges = JSON.parse(JSON.stringify(DEFAULT_AGE_RANGES));
+    localStorage.removeItem('portal_kependudukan_age_ranges');
+    renderAgeRangeInputs(customAgeRanges);
+    reclassifyAllAgesAndRefresh();
+  });
+}
+
+if (btnApplyAgeRanges) {
+  btnApplyAgeRanges.addEventListener('click', () => {
+    const newRanges = getAgeRangesFromInputs();
+    if (!newRanges.length) {
+      alert('Minimal harus ada 1 kategori usia.');
+      return;
+    }
+
+    for (let i = 0; i < newRanges.length; i++) {
+      const r = newRanges[i];
+      if (isNaN(r.min) || r.min < 0) {
+        alert(`Batas usia awal pada baris ke-${i + 1} tidak valid.`);
+        return;
+      }
+      if (r.max !== null && r.max < r.min) {
+        alert(`Usia akhir (${r.max}) tidak boleh lebih kecil dari usia awal (${r.min}) pada baris ke-${i + 1}.`);
+        return;
+      }
+      if (!r.label) {
+        r.label = r.max === null ? `${r.min}+ Tahun` : `${r.min}–${r.max} Tahun`;
+      }
+    }
+
+    customAgeRanges = newRanges;
+    localStorage.setItem('portal_kependudukan_age_ranges', JSON.stringify(customAgeRanges));
+    renderAgeRangeInputs(customAgeRanges);
+    reclassifyAllAgesAndRefresh();
+  });
+}
+
+function renderAgeRangeInputs(ranges = customAgeRanges) {
+  if (!ageRangesContainer) return;
+  ageRangesContainer.innerHTML = ranges.map((r, idx) => `
+    <div class="age-range-row grid grid-cols-12 gap-2 items-center bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+      <div class="col-span-5 sm:col-span-5">
+        <label class="block text-[10px] font-semibold text-slate-400 uppercase mb-0.5">Nama Kategori</label>
+        <input type="text" class="age-label w-full text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+               placeholder="Misal: Baduta / Remaja" value="${escapeHtml(r.label)}" />
+      </div>
+      <div class="col-span-3 sm:col-span-3">
+        <label class="block text-[10px] font-semibold text-slate-400 uppercase mb-0.5">Dari (Thn)</label>
+        <input type="number" min="0" max="150" class="age-min w-full text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+               value="${r.min}" />
+      </div>
+      <div class="col-span-3 sm:col-span-3">
+        <label class="block text-[10px] font-semibold text-slate-400 uppercase mb-0.5">Sampai (Kosong = +)</label>
+        <input type="number" min="0" max="150" class="age-max w-full text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+               placeholder="Tak terbatas" value="${r.max !== null ? r.max : ''}" />
+      </div>
+      <div class="col-span-1 flex justify-end pt-3">
+        <button type="button" onclick="removeAgeRangeRow(${idx})" title="Hapus kategori"
+                class="text-rose-500 hover:text-rose-700 hover:bg-rose-50 p-1.5 rounded-lg transition cursor-pointer">
+          ✕
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function removeAgeRangeRow(index) {
+  const current = getAgeRangesFromInputs();
+  if (current.length <= 1) {
+    alert('Minimal sisakan 1 kategori usia.');
+    return;
+  }
+  current.splice(index, 1);
+  renderAgeRangeInputs(current);
+}
+
+function getAgeRangesFromInputs() {
+  const rows = document.querySelectorAll('#ageRangesContainer .age-range-row');
+  const result = [];
+  rows.forEach((row, idx) => {
+    const label = row.querySelector('.age-label').value.trim();
+    const minRaw = row.querySelector('.age-min').value.trim();
+    const maxRaw = row.querySelector('.age-max').value.trim();
+    result.push({
+      id: `cat_${idx + 1}_${Date.now()}`,
+      label,
+      min: minRaw === '' ? NaN : parseInt(minRaw, 10),
+      max: maxRaw === '' ? null : parseInt(maxRaw, 10)
+    });
+  });
+  return result;
+}
+
+function syncAgeFilterDropdown() {
+  if (!filterAgeGroup) return;
+  const previousValue = filterAgeGroup.value;
+  const optionsHtml = [
+    `<option value="ALL">Semua Kelompok Umur</option>`,
+    `<option value="PUS">Sasaran PUS (Istri 15–49 Thn)</option>`,
+    ...customAgeRanges.map(r => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.label)}</option>`)
+  ];
+  filterAgeGroup.innerHTML = optionsHtml.join('');
+
+  const stillExists = Array.from(filterAgeGroup.options).some(opt => opt.value === previousValue);
+  filterAgeGroup.value = stillExists ? previousValue : 'ALL';
+}
+
+function reclassifyAllAgesAndRefresh() {
+  syncAgeFilterDropdown();
+  if (!allPopulationData.length) return;
+
+  allPopulationData = allPopulationData.map(person => {
+    if (typeof person.umur === 'number') {
+      const cat = getAgeCategoryObj(person.umur);
+      return {
+        ...person,
+        kategoriUmurId: cat ? cat.id : 'UNMATCHED',
+        kategoriUmur: cat ? cat.label : 'Di Luar Kategori'
+      };
+    }
+    return {
+      ...person,
+      kategoriUmurId: 'UNKNOWN',
+      kategoriUmur: 'Tidak Diketahui'
+    };
+  });
+
+  updateDashboard();
 }
 
 // ============================================================================
@@ -738,6 +931,8 @@ function buildUniversalPersonRecord(row, colMap, kopAddress, sheetName, totalShe
 
   if (!hasRealDemographicData) return null;
 
+  const ageCatObj = umur !== null ? getAgeCategoryObj(umur) : null;
+
   return {
     nama,
     nik: nikVal || "-",
@@ -754,7 +949,8 @@ function buildUniversalPersonRecord(row, colMap, kopAddress, sheetName, totalShe
     jk,
     tglLahir: tglFormatted,
     umur: umur !== null ? umur : "-",
-    kategoriUmur: umur !== null ? getAgeCategory(umur) : "Tidak Diketahui",
+    kategoriUmurId: umur !== null ? (ageCatObj ? ageCatObj.id : "UNMATCHED") : "UNKNOWN",
+    kategoriUmur: umur !== null ? (ageCatObj ? ageCatObj.label : "Di Luar Kategori") : "Tidak Diketahui",
     alamat: finalAlamat
   };
 }
@@ -941,23 +1137,27 @@ function calculateAge(birthDate) {
   return age < 0 ? 0 : age;
 }
 
-function getAgeCategory(age) {
-  if (age >= 0 && age <= 5) return "0-5";
-  if (age >= 6 && age <= 15) return "6-15";
-  if (age >= 16 && age <= 49) return "16-49";
-  if (age >= 50 && age <= 59) return "50-59";
-  if (age >= 60) return "60+";
-  return "Tidak Diketahui";
+function getAgeCategoryObj(age) {
+  for (const range of customAgeRanges) {
+    const aboveMin = age >= range.min;
+    const belowMax = range.max === null || age <= range.max;
+    if (aboveMin && belowMax) return range;
+  }
+  return null;
 }
 
 function updateDashboard() {
+  syncAgeFilterDropdown();
+
   const total = allPopulationData.length;
   let totalKK = 0;
   let laki = 0;
   let perempuan = 0;
   let nikBermasalah = 0;
   let jumlahPUS = 0;
-  const ageCounts = { "0-5": 0, "6-15": 0, "16-49": 0, "50-59": 0, "60+": 0 };
+
+  const ageCounts = {};
+  customAgeRanges.forEach(r => { ageCounts[r.id] = 0; });
 
   for (const d of allPopulationData) {
     if (d.isKepalaKeluarga) totalKK++;
@@ -966,7 +1166,9 @@ function updateDashboard() {
     else if (d.jk === "Perempuan") perempuan++;
     else nikBermasalah++;
 
-    if (ageCounts.hasOwnProperty(d.kategoriUmur)) ageCounts[d.kategoriUmur]++;
+    if (ageCounts.hasOwnProperty(d.kategoriUmurId)) {
+      ageCounts[d.kategoriUmurId]++;
+    }
   }
 
   const persenL = total ? ((laki / total) * 100).toFixed(1) : 0;
@@ -988,6 +1190,11 @@ function updateDashboard() {
   const elStatPUS = document.getElementById('statPUS');
   if (elStatPUS) elStatPUS.textContent = jumlahPUS.toLocaleString('id-ID');
 
+  const subtitleEl = document.getElementById('ageChartSubtitle');
+  if (subtitleEl) {
+    subtitleEl.textContent = `Distribusi berdasarkan ${customAgeRanges.length} kategori rentang usia aktif`;
+  }
+
   renderCharts(laki, perempuan, ageCounts);
   renderSummaryBoxes(laki, perempuan, persenL, persenP, ageCounts);
   applyFilters();
@@ -1005,20 +1212,23 @@ function renderSummaryBoxes(laki, perempuan, persenL, persenP, ageCounts) {
     </div>
   `;
 
-  const labels = [
-    { key: "0-5", title: "0–5 Thn" },
-    { key: "6-15", title: "6–15 Thn" },
-    { key: "16-49", title: "16–49 Thn" },
-    { key: "50-59", title: "50–59 Thn" },
-    { key: "60+", title: "60+ Thn" },
-  ];
+  const summaryGrid = document.getElementById('ageSummaryGrid');
+  summaryGrid.className = "mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-center text-xs";
 
-  document.getElementById('ageSummaryGrid').innerHTML = labels.map(item => `
-    <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-2">
-      <div class="text-slate-500 font-medium">${item.title}</div>
-      <div class="text-sm font-extrabold text-blue-700 mt-0.5">${ageCounts[item.key]}</div>
+  summaryGrid.innerHTML = customAgeRanges.map(item => `
+    <div onclick="quickFilterAgeCategory('${escapeHtml(item.id)}')" title="Klik untuk memfilter ${escapeHtml(item.label)}"
+         class="bg-slate-50 hover:bg-blue-50 border border-slate-200/80 hover:border-blue-300 rounded-xl p-2 cursor-pointer transition">
+      <div class="text-slate-500 font-medium truncate">${escapeHtml(item.label)}</div>
+      <div class="text-sm font-extrabold text-blue-700 mt-0.5">${ageCounts[item.id] || 0}</div>
     </div>
   `).join('');
+}
+
+function quickFilterAgeCategory(categoryId) {
+  activeFamilyKeyFilter = null;
+  filterAgeGroup.value = categoryId;
+  applyFilters();
+  document.getElementById('tableBody').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function renderCharts(laki, perempuan, ageCounts) {
@@ -1046,21 +1256,20 @@ function renderCharts(laki, perempuan, ageCounts) {
     }
   });
 
+  const palette = ['#38bdf8', '#3b82f6', '#1d4ed8', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899'];
+  const chartLabels = customAgeRanges.map(r => r.label);
+  const chartValues = customAgeRanges.map(r => ageCounts[r.id] || 0);
+  const chartColors = customAgeRanges.map((_, idx) => palette[idx % palette.length]);
+
   const ctxAge = document.getElementById('chartAge').getContext('2d');
   ageChartInstance = new Chart(ctxAge, {
     type: 'bar',
     data: {
-      labels: ['0–5 Tahun', '6–15 Tahun', '16–49 Tahun', '50–59 Tahun', '60+ Tahun'],
+      labels: chartLabels,
       datasets: [{
         label: 'Jumlah Jiwa',
-        data: [
-          ageCounts["0-5"],
-          ageCounts["6-15"],
-          ageCounts["16-49"],
-          ageCounts["50-59"],
-          ageCounts["60+"]
-        ],
-        backgroundColor: ['#38bdf8', '#3b82f6', '#1d4ed8', '#f59e0b', '#ef4444'],
+        data: chartValues,
+        backgroundColor: chartColors,
         borderRadius: 8
       }]
     },
@@ -1097,7 +1306,7 @@ function applyFilters() {
     const matchGender = selectedGender === "ALL" || item.jk === selectedGender;
     const matchAge =
       selectedAge === "ALL" ||
-      (selectedAge === "PUS" ? item.isPUS : item.kategoriUmur === selectedAge);
+      (selectedAge === "PUS" ? item.isPUS : item.kategoriUmurId === selectedAge);
     return matchKeyword && matchGender && matchAge;
   });
 
@@ -1178,7 +1387,7 @@ function renderTable(data) {
         <td class="py-3 px-4 ${row.isKepalaKeluarga ? 'font-bold text-slate-800' : 'text-slate-700'}">${row.umur} Thn</td>
         <td class="py-3 px-4">
           <span class="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100">
-            ${row.kategoriUmur} Thn
+            ${escapeHtml(row.kategoriUmur)}
           </span>
         </td>
         <td class="py-3 px-4 text-slate-600">${escapeHtml(row.alamat)}</td>
@@ -1211,7 +1420,7 @@ function exportTableToExcel() {
     "Jenis Kelamin": row.jk,
     "Tanggal Lahir": row.tglLahir,
     "Umur (Thn)": row.umur,
-    "Kategori Umur": `${row.kategoriUmur} Thn`,
+    "Kategori Umur": row.kategoriUmur,
     "Alamat": row.alamat
   }));
 
@@ -1274,7 +1483,7 @@ function exportTableToPDF() {
     row.jk,
     row.tglLahir,
     `${row.umur} Thn`,
-    `${row.kategoriUmur} Thn`,
+    row.kategoriUmur,
     row.alamat
   ]);
 
@@ -1313,7 +1522,7 @@ function exportTableToPDF() {
       3: { cellWidth: 24, halign: 'center' },
       4: { cellWidth: 22, halign: 'center' },
       5: { cellWidth: 16, halign: 'center' },
-      6: { cellWidth: 20, halign: 'center' },
+      6: { cellWidth: 22, halign: 'center' },
       7: { cellWidth: 'auto' }
     },
     didParseCell: function (data) {
