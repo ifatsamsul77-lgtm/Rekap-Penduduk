@@ -116,6 +116,39 @@
         </div>
       </section>
 
+      <!-- Panel Kustomisasi Kategori Usia -->
+      <section class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h3 class="text-sm font-bold text-slate-800">Pengaturan Kategori Kelompok Umur</h3>
+            <p class="text-xs text-slate-500">Sesuaikan rentang usia sesuai kebutuhan analisis (contoh: Baduta 0–2, Balita 0–5, Remaja 10–24, Lansia 60+)</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" id="btnToggleAgeConfig" class="text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-xl transition cursor-pointer">
+              Atur Rentang Usia
+            </button>
+          </div>
+        </div>
+
+        <!-- Form Editor Rentang Usia -->
+        <div id="ageConfigPanel" class="hidden mt-4 pt-4 border-t border-slate-100 space-y-3">
+          <div id="ageRangesContainer" class="space-y-2"></div>
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
+            <button type="button" id="btnAddAgeRange" class="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-xl transition cursor-pointer">
+              + Tambah Kategori
+            </button>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" id="btnResetAgeRanges" class="text-xs font-semibold text-slate-600 hover:bg-slate-100 px-3.5 py-2 rounded-xl border border-slate-200 transition cursor-pointer">
+                Reset Default
+              </button>
+              <button type="button" id="btnApplyAgeRanges" class="text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl shadow-sm transition cursor-pointer">
+                Terapkan &amp; Pilah Ulang
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- Bagian Grafik -->
       <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Grafik 1: Jenis Kelamin -->
@@ -134,7 +167,7 @@
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col">
           <div class="mb-4">
             <h3 class="text-base font-bold text-slate-800">Rekapitulasi per Kelompok Umur</h3>
-            <p class="text-xs text-slate-500">Distribusi berdasarkan 5 kategori rentang usia</p>
+            <p id="ageChartSubtitle" class="text-xs text-slate-500">Distribusi berdasarkan kategori rentang usia aktif</p>
           </div>
           <div class="relative h-64 w-full">
             <canvas id="chartAge"></canvas>
@@ -160,11 +193,6 @@
             <select id="filterAgeGroup" aria-label="Filter Kelompok Umur" class="text-sm border border-slate-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="ALL">Semua Kelompok Umur</option>
               <option value="PUS">Sasaran PUS (Istri 15–49 Thn)</option>
-              <option value="0-5">0–5 Tahun</option>
-              <option value="6-15">6–15 Tahun</option>
-              <option value="16-49">16–49 Tahun</option>
-              <option value="50-59">50–59 Tahun</option>
-              <option value="60+">60+ Tahun</option>
             </select>
             <input type="text" id="searchInput" placeholder="Cari nama / NIK / desa / RT..." class="text-sm border border-slate-300 rounded-xl px-3.5 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
             <button type="button" id="btnExportExcel" class="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold px-4 py-2 rounded-xl shadow-sm transition cursor-pointer">
